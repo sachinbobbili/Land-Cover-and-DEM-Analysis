@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome | India Geospatial Analysis</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Segoe UI, sans-serif;
+            background: #f4f7f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .welcome-box {
+            width: 50%;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+        .welcome-box img {
+            width: 70%;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #007bff;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #555;
+            font-size: 1.1em;
+            line-height: 1.6em;
+            margin-bottom: 25px;
+        }
+        .enter-btn {
+            background: #007bff;
+            color: white;
+            padding: 12px 28px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1em;
+            cursor: pointer;
+        }
+        .enter-btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="welcome-box">
+        <img src="https://geospatialworld.net/wp-content/uploads/2022/03/Earth-Observation-The-Growth-Story.jpg">
+
+        <h1>District Level Geospatial Analysis</h1>
+
+        <p>
+            This application provides district-level geospatial intelligence using Google Earth Engine.
+            Users can analyze land cover, hydrology, elevation, slope and surface water dynamics for all districts of India.
+            Select your district of interest to visualize map layers and generate land cover statistics instantly.
+        </p>
+
+        <button class="enter-btn" onclick="window.location.href='/app'">
+            ENTER APPLICATION
+        </button>
+    </div>
+</body>
+</html>

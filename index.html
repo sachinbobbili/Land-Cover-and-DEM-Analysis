@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>India Geospatial Data Viewer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            color: #333;
+            background-color: #f4f7f6;
+        }
+        #sidebar {
+            width: 350px; /* Slightly wider sidebar */
+            padding: 25px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            background-color: #ffffff;
+            border-right: 1px solid #e0e0e0;
+            overflow-y: auto; /* Enable scrolling for long content */
+        }
+        #map-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative; /* For absolute positioning of controls */
+        }
+        #map {
+            flex-grow: 1;
+            background-color: #e6e6e6; /* Light gray background for map */
+        }
+        h1 {
+            color: #007bff;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.8em;
+            font-weight: 600;
+        }
+        h2 {
+            color: #0056b3;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            font-weight: 500;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        h3 {
+            color: #0056b3;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            font-weight: 500;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        select, button {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            box-sizing: border-box; /* Include padding in width */
+        }
+        select:focus, button:focus {
+            outline: none;
+            border-color: #80bdff;
+            box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 5px; /* Spacing between buttons */
+        }
+        button:hover:not(:disabled) {
+            background-color: #0056b3;
+            transform: translateY(-1px);
+        }
+        button:disabled {
+            background-color: #a0cbed;
+            cursor: not-allowed;
+        }
+        
+        #loading-spinner {
+            display: none;
+            text-align: center;
+            margin-top: 25px;
+            color: #007bff;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        #chart-container {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        #landcover-chart {
+            max-height: 250px; /* Limit chart height */
+        }
+
+        /* Layer Control Panel - Adjusted Position */
+        #layer-control-panel {
+            position: absolute;
+            top: 70px; /* Moved down by 70px as requested */
+            right: 15px; 
+            left: auto; 
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            z-index: 1000; /* Above the map */
+            min-width: 220px; /* Wider to accommodate more layers */
+            box-sizing: border-box; /* Include padding in width */
+        }
+        #layer-control-panel h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #0056b3;
+            font-size: 1.1em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        #layer-control-panel label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-weight: normal;
+            cursor: pointer;
+            color: #333;
+        }
+        #layer-control-panel input[type="checkbox"] {
+            margin-right: 8px;
+            width: auto; /* Override general select/button width */
+            transform: scale(1.2); /* Slightly larger checkboxes */
+        }
+
+        /* Leaflet Custom Legend styles */
+        .info.legend {
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            line-height: 1.6em;
+            color: #555;
+            min-width: 200px;
+            margin-bottom: 5px; /* Space between multiple legends if they stack */
+        }
+        .info.legend h5 {
+            margin-top: 0;
+            margin-bottom: 5px;
+            font-size: 1em;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 3px;
+        }
+        .info.legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.85; /* Slightly less opaque */
+            border-radius: 3px;
+            border: 1px solid rgba(0,0,0,0.1); /* Slight border for clarity */
+        }
+        .info.legend span.value-range {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        /* Custom app title bar */
+        #app-title-bar {
+            background-color: #007bff;
+            color: white;
+            padding: 15px 0;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            font-size: 1.8em;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div class="form-group">
+            <label for="state-select">Select State:</label>
+            <select id="state-select">
+                <option value="">Loading States...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="district-select">Select District:</label>
+            <select id="district-select" disabled>
+                <option value="">Select a State first</option>
+            </select>
+        </div>
+        <button id="show-map-btn" disabled>Display Data</button> <!-- Changed button text -->
+        <div id="loading-spinner">Loading...</div>
+        <div id="chart-container" style="display: none;">
+            <h3>Land Cover Area (km²)</h3>
+            <canvas id="landcover-chart"></canvas>
+        </div>
+    </div>
+    <div id="map-container">
+        <div id="app-title-bar">
+           Land Cover and Hydrology Analysis
+        </div>
+        <div id="map"></div>
+        <div id="layer-control-panel" style="display: none;">
+            <h4>Map Layers</h4>  
+            <label>
+                <input type="checkbox" id="toggle-gsw" checked> Global Surface Water
+            </label>
+            <label>
+                <input type="checkbox" id="toggle-rivers" checked> River Networks
+            </label>
+            <label>
+                <input type="checkbox" id="toggle-slope" checked> Slope <!-- New toggle -->
+            </label>
+            <label>
+                <input type="checkbox" id="toggle-dem" checked> SRTM DEM <!-- Updated label -->
+            </label>
+            <label>
+                <input type="checkbox" id="toggle-landcover" checked> Dynamic World LULC <!-- Updated label -->
+            </label>
+            <label>
+                <input type="checkbox" id="toggle-boundary" checked> District Boundary
+            </label>
+        </div>
+    </div>
+
+    <script>
+        var map = L.map('map').setView([20.5937, 78.9629], 4); // Default to India center
+        L.tileLayer('http://mt0.google.com/vt/lyrs=r&hl=en&x={x}&y={y}&z={z}', {
+            attribution: '&copy; <a href="https://maps.google.com/">GoogleMap</a> contributors'
+        }).addTo(map);
+
+        // Layer variables
+        var landcoverLayer;
+        var demLayer;
+        var slopeLayer;     // New layer variable
+        var riversLayer;
+        var gswLayer;
+        var boundaryLayer;
+        var landcoverChart; // Chart.js instance
+
+        // UI elements
+        const stateSelect = document.getElementById('state-select');
+        const districtSelect = document.getElementById('district-select');
+        const showMapBtn = document.getElementById('show-map-btn');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const chartContainer = document.getElementById('chart-container');
+
+        // Layer toggles
+        const toggleLandcover = document.getElementById('toggle-landcover');
+        const toggleDem = document.getElementById('toggle-dem');
+        const toggleSlope = document.getElementById('toggle-slope'); // New toggle
+        const toggleRivers = document.getElementById('toggle-rivers');
+        const toggleGsw = document.getElementById('toggle-gsw');
+        const toggleBoundary = document.getElementById('toggle-boundary');
+        const layerControlPanel = document.getElementById('layer-control-panel');
+
+        // Define visualization parameters for ALL layers (matching app.py)
+        // Google Dynamic World V1 LULC Visualization Parameters & Names
+        const LANDCOVER_VIS = {
+            'min': 0, 'max': 8,
+            'palette': [
+                '419BDF',  // 0: Water
+                '397D49',  // 1: Trees
+                '88B053',  // 2: Grass
+                '7A87C6',  // 3: Flooded vegetation
+                'E49635',  // 4: Crops
+                'DFC35A',  // 5: Shrub and scrub
+                'C4281B',  // 6: Built
+                'A59B8F',  // 7: Bare
+                'B39FE1'   // 8: Snow and ice
+            ],
+            'names': [
+                'Water', 'Trees', 'Grass', 'Flooded vegetation', 'Crops',
+                'Shrub and scrub', 'Built', 'Bare', 'Snow and ice'
+            ],
+            'title': 'Dynamic World LULC'
+        };
+
+        // SRTM DEM 90m Visualization Parameters
+        const DEM_VIS = {
+            'min': 0, 'max': 5000,
+            'palette': ['006633', 'E5FFCC', '662A00', 'FF8000', 'FFBF00', 'FFFFBF', 'FFFFFF'],
+            'title': 'SRTM DEM Elevation (m)'
+        };
+
+        // Slope Visualization Parameters (derived from SRTM DEM)
+        const SLOPE_VIS = {
+            'min': 0, 'max': 90,
+            'palette': ['00FF00', 'FFFF00', 'FF0000'],
+            'title': 'Slope (Degrees)'
+        };
+
+        const RIVERS_VIS = {
+            'palette': ['0000FF'], 
+            'title': 'HydroSHEDS River Networks'
+        };
+
+        const JRC_GSW_VIS = {
+            'min': 0, 'max': 100,
+            'palette': ['FFFFFF', '0000FF'],
+            'names': ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%'], 
+            'title': 'Global Surface Water Occurrence (%)'
+        };
+
+        // Function to show/hide loading spinner
+        function toggleLoading(show) {
+            loadingSpinner.style.display = show ? 'block' : 'none';
+            showMapBtn.disabled = show;
+        }
+
+        // Function to update layer visibility
+        function updateLayerVisibility() {
+            if (landcoverLayer) { landcoverLayer.setOpacity(toggleLandcover.checked ? 1 : 0); }
+            if (demLayer) { demLayer.setOpacity(toggleDem.checked ? 1 : 0); }
+            if (slopeLayer) { slopeLayer.setOpacity(toggleSlope.checked ? 1 : 0); } // New
+            if (riversLayer) { riversLayer.setOpacity(toggleRivers.checked ? 1 : 0); }
+            if (gswLayer) { gswLayer.setOpacity(toggleGsw.checked ? 1 : 0); }
+            if (boundaryLayer) { boundaryLayer.setOpacity(toggleBoundary.checked ? 1 : 0); }
+        }
+
+        // Add event listeners for layer toggles
+        toggleLandcover.addEventListener('change', updateLayerVisibility);
+        toggleDem.addEventListener('change', updateLayerVisibility);
+        toggleSlope.addEventListener('change', updateLayerVisibility); // New
+        toggleRivers.addEventListener('change', updateLayerVisibility);
+        toggleGsw.addEventListener('change', updateLayerVisibility);
+        toggleBoundary.addEventListener('change', updateLayerVisibility);
+
+        // Helper function to create a generic Leaflet legend
+        function createLegend(visParams, isCategorical = true) {
+            var legend = L.control({position: 'bottomright'});
+
+            legend.onAdd = function (map) {
+                var div = L.DomUtil.create('div', 'info legend');
+                div.innerHTML += '<h5>' + visParams.title + '</h5>';
+
+                if (isCategorical && visParams.names && visParams.palette) {
+                    for (var i = 0; i < visParams.names.length; i++) {
+                        div.innerHTML +=
+                            '<i style="background:' + '#' + visParams.palette[i] + '"></i> ' + visParams.names[i] + '<br>';
+                    }
+                } else if (!isCategorical && visParams.palette && visParams.min !== undefined && visParams.max !== undefined) {
+                    // For continuous scales (e.g., DEM, Slope, GSW occurrence)
+                    var gradient = 'linear-gradient(to right';
+                    for (let i = 0; i < visParams.palette.length; i++) {
+                        gradient += ', #' + visParams.palette[i];
+                        if (i < visParams.palette.length - 1) {
+                            gradient += ' ' + (i / (visParams.palette.length - 1) * 100) + '%';
+                        }
+                    }
+                    gradient += ')';
+
+                    div.innerHTML +=
+                        '<div style="width: 100%; height: 20px; background: ' + gradient + ';"></div>' +
+                        '<span class="value-range">' + visParams.min + '</span> &mdash; ' +
+                        '<span class="value-range">' + visParams.max + '</span>';
+
+                    // Add more granular labels for GSW if desired (specific to GSW_VIS)
+                    if (visParams === JRC_GSW_VIS && visParams.names) {
+                        div.innerHTML += '<br>';
+                        // For GSW, we want to show the specific range labels, not just min/max
+                        for (var i = 0; i < visParams.names.length; i++) {
+                            // Map the names to a representative color from the palette
+                            const colorIndex = Math.floor(i / (visParams.names.length - 1) * (visParams.palette.length - 1));
+                            const color = visParams.palette[colorIndex];
+                             div.innerHTML +=
+                                '<i style="background:' + '#' + color + '; width: 10px; height: 10px; float: none; display: inline-block;"></i> ' + visParams.names[i] + ' ';
+                            if ((i + 1) % 2 === 0 && i < visParams.names.length -1) div.innerHTML += '<br>'; // New line every 2 for compactness
+                        }
+                    }
+                }
+                return div;
+            };
+            return legend;
+        }
+
+        // Initialize legends (only LULC will be added to map)
+        var landcoverLegend = createLegend(LANDCOVER_VIS, false);
+        // Other legends are created but not added to the map as per request
+        var demLegend = createLegend(DEM_VIS, false);
+        var slopeLegend = createLegend(SLOPE_VIS, false); // New legend
+        var riversLegend = createLegend(RIVERS_VIS, false); // Rivers are painted as single color, so categorical with one entry
+        var gswLegend = createLegend(JRC_GSW_VIS, false);
+
+        // Function to remove all active legends
+        function removeAllLegends() {
+            if (landcoverLegend.addTo(map)) map.removeControl(landcoverLegend);
+            if (demLegend.addTo(map)) map.removeControl(demLegend);
+            if (slopeLegend.addTo(map)) map.removeControl(slopeLegend);
+            if (riversLegend.addTo(map)) map.removeControl(riversLegend);
+            if (gswLegend.addTo(map)) map.removeControl(gswLegend);
+        }
+
+        // Fetch states
+        fetch('/get_states')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error loading states: ' + data.error);
+                    stateSelect.innerHTML = '<option value="">Error loading</option>';
+                } else {
+                    stateSelect.innerHTML = '<option value="">--Select State--</option>';
+                    data.states.forEach(state => {
+                        const option = document.createElement('option');
+                        option.value = state;
+                        option.textContent = state;
+                        stateSelect.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching states:', error);
+                alert('Network error while fetching states.');
+            });
+
+        // Event listener for state selection
+        stateSelect.addEventListener('change', () => {
+            const selectedState = stateSelect.value;
+            districtSelect.innerHTML = '<option value="">Loading Districts...</option>';
+            districtSelect.disabled = true;
+            showMapBtn.disabled = true;
+            chartContainer.style.display = 'none'; // Hide chart
+            layerControlPanel.style.display = 'none'; // Hide layer panel
+            removeAllLegends(); // Remove all legends
+
+            // Clear existing layers
+            if (landcoverLayer) { map.removeLayer(landcoverLayer); landcoverLayer = null; }
+            if (demLayer) { map.removeLayer(demLayer); demLayer = null; }
+            if (slopeLayer) { map.removeLayer(slopeLayer); slopeLayer = null; } // New
+            if (riversLayer) { map.removeLayer(riversLayer); riversLayer = null; }
+            if (gswLayer) { map.removeLayer(gswLayer); gswLayer = null; }
+            if (boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
+
+            if (selectedState) {
+                fetch(`/get_districts/${selectedState}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert('Error loading districts: ' + data.error);
+                            districtSelect.innerHTML = '<option value="">Error loading</option>';
+                        } else {
+                            districtSelect.innerHTML = '<option value="">--Select District--</option>';
+                            data.districts.forEach(district => {
+                                const option = document.createElement('option');
+                                option.value = district;
+                                option.textContent = district;
+                                districtSelect.appendChild(option);
+                            });
+                            districtSelect.disabled = false;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching districts:', error);
+                        alert('Network error while fetching districts.');
+                    });
+            } else {
+                districtSelect.innerHTML = '<option value="">Select a State first</option>';
+            }
+        });
+
+        // Event listener for district selection
+        districtSelect.addEventListener('change', () => {
+            if (districtSelect.value && stateSelect.value) {
+                showMapBtn.disabled = false;
+            } else {
+                showMapBtn.disabled = true;
+            }
+        });
+
+        // Event listener for "Display Data" button
+        showMapBtn.addEventListener('click', () => {
+            const state = stateSelect.value;
+            const district = districtSelect.value;
+            // Update Title Bar Based on District
+document.getElementById('app-title-bar').textContent =
+     district +  " District Land Cover and Hydrology Analysis " ;
+
+
+            if (!state || !district) {
+                alert('Please select both a state and a district.');
+                return;
+            }
+
+            toggleLoading(true);
+
+            // Clear existing layers and legends
+            if (landcoverLayer) { map.removeLayer(landcoverLayer); }
+            if (demLayer) { map.removeLayer(demLayer); }
+            if (slopeLayer) { map.removeLayer(slopeLayer); } // New
+            if (riversLayer) { map.removeLayer(riversLayer); }
+            if (gswLayer) { map.removeLayer(gswLayer); }
+            if (boundaryLayer) { map.removeLayer(boundaryLayer); }
+            removeAllLegends();
+
+            fetch('/generate_map_data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ state, district }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                toggleLoading(false);
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                // Add Layers (initially all checked and visible)
+                landcoverLayer = L.tileLayer(data.landcover_url).addTo(map);
+                demLayer = L.tileLayer(data.dem_url).addTo(map);
+                slopeLayer = L.tileLayer(data.slope_url).addTo(map); // New Layer
+                riversLayer = L.tileLayer(data.rivers_url).addTo(map); 
+                gswLayer = L.tileLayer(data.gsw_url).addTo(map); 
+                boundaryLayer = L.tileLayer(data.boundary_url).addTo(map);
+
+                // Ensure all toggles are checked by default when layers are loaded
+                toggleLandcover.checked = true;
+                toggleDem.checked = false;
+                toggleSlope.checked = false; // New
+                toggleRivers.checked = false;
+                toggleGsw.checked = false;
+                toggleBoundary.checked = true;
+                updateLayerVisibility(); // Ensure initial opacities are correct
+
+                // Set map view
+                map.setView(data.center, data.zoom);
+
+                // Add ONLY Land Cover legend to map as requested
+                landcoverLegend.addTo(map);
+
+                
+                // Update Chart
+                if (landcoverChart) {
+                    landcoverChart.destroy(); 
+                }
+                const ctx = document.getElementById('landcover-chart').getContext('2d');
+                landcoverChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.chart_data.labels,
+                        datasets: [{
+                            label: 'Area (km²)',
+                            data: data.chart_data.values,
+                            backgroundColor: LANDCOVER_VIS.palette.map(color => '#' + color + 'B0'), 
+                            borderColor: LANDCOVER_VIS.palette.map(color => '#' + color),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Land Cover Type' }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Area (km²)' }
+                            }
+                        },
+
+                        plugins: {
+                            legend: { display: false },
+                            title: { display: true, text:  `LULC Distribution`, font: { size: 16 } }
+                        }
+                    }
+                });
+
+                chartContainer.style.display = 'block';
+                layerControlPanel.style.display = 'block'; // Show layer panel
+            })
+            .catch(error => {
+                toggleLoading(false);
+                console.error('Error:', error);
+                alert('An error occurred while generating map data. Please try again.');
+            });
+        });
+
+    </script>
+</body>
+</html>
